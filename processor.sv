@@ -4,6 +4,8 @@ module proc_top(input clk, reset);
 //parameter W represents data width
 parameter data_width = 8, addr_width = 8, num_reg = 5, instruct_width = 32;
 
+reg [instruct_width-1:0] instruct;
+
 prog_cnt #(.W(data_width)) prog_cnt_0(
 .pc_i(), .reset(reset), .clk(clk), .pc_o(inst_addr)
 );
@@ -25,7 +27,7 @@ ALUnit #(.W(data_width)) ALU_0(
 
 //needs ctrl signal
 Reg_file #(.W(data_width),. N(num_reg)) Reg_file_0(
-.rreg1(instruct[25:21]), .rreg2(instruct[20:16), .wreg(instruct[15:11]), 
+.rreg1(instruct[25:21]), .rreg2(instruct[20:16]), .wreg(instruct[15:11]), 
 .wdata(), .write(), .clk(clk), .reset(reset), .rdata1(rdata1), .rdata2(rdata2)
 );
 endmodule
