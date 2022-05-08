@@ -4,7 +4,8 @@ module proc_top(input clk, reset);
 //parameter W represents data width
 parameter data_width = 8, addr_width = 8, num_reg = 5, instruct_width = 32;
 
-reg [instruct_width-1:0] instruct;
+wire [instruct_width-1:0] instruct;
+wire [data_width-1:0] dm_o, rdata1, rdata2, ALU_o, inst_addr;
 
 prog_cnt #(.W(data_width)) prog_cnt_0(
 .pc_i(), .reset(reset), .clk(clk), .pc_o(inst_addr)
