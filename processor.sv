@@ -1,36 +1,55 @@
 //MIPS RISC 8-bit processor
+//
+//Need all the contrl logic
 module proc_top(input clk, reset);
-
 //parameter W represents data width
 parameter data_width = 8, addr_width = 8, num_reg = 5, instruct_width = 32;
 
-wire [instruct_width-1:0] instruct;
-wire [data_width-1:0] dm_o, rdata1, rdata2, ALU_o, inst_addr;
+wire [instruct_width-1:0] instruct, inst_addr, pc_next, extended, pc_1, pc_branch;
+wire [data_width-1:0] dm_o, rdata1, rdata2, ALU_o, ALU_b;
+wire [num_reg-1:0] wreg;
+wire [3:0] ALU_ctrl;
+wire reg_dst, branch, zero, mem_read, mem_to_reg, mem_write, alu_src, reg_write;
 
-prog_cnt #(.W(data_width)) prog_cnt_0(
-.pc_i(), .reset(reset), .clk(clk), .pc_o(inst_addr)
+//Program counter
+assign pc_1 = inst_addr + 32'b1;
+assign pc_branch = pc_1 + extended;
+assign pc_next = (branch & zero) ? pc_branch : pc_1;
+prog_cnt #(.W(instruct_width)) prog_cnt_0(
+.pc_i(pc_next), .reset(reset), .clk(clk), .pc_o(inst_addr)
 );
 
+//Instruction memory
 //set up for external programing
-SRAM #(.W(instruct_width), .N(addr_width)) i_mem(
+SRAM #(.W(instruct_width), .N(instruct_width)) i_mem(
 .addr(inst_addr), .d_i(), .cs(1'b1), .oe(1'b1), .we(1'b0), .d_o(instruct)
 );
 
-//needs ctrl signals
+//Data memory
 SRAM #(.W(data_width), .N(addr_width)) d_mem(
-.addr(ALU_o), .d_i(rdata2), .cs(1'b1), .oe(), .we(), .d_o(dm_o) 
+.addr(ALU_o), .d_i(rdata2), .cs(1'b1), .oe(mem_read), .we(mem_write), .d_o(dm_o) 
 );
 
-//needs ctrl signal
+//ALU
+assign ALU_b = alu_src ? extended[7:0] : rdata2 ;
 ALUnit #(.W(data_width)) ALU_0(
-.A(rdata1), .B(), .ALU_ctrl(), .ALU_o(ALU_o), .cout(), .zero()
+.A(rdata1), .B(ALU_b), .ALU_ctrl(ALU_ctrl), .ALU_o(ALU_o), .cout(), .zero(zero)
 );
 
-//needs ctrl signal
+//Register file
+assign rreg1 = instruct[25:21];
+assign rreg2 = instruct[20:16];
+assign wreg  = reg_dst ? instruct [15:11] : rreg2;
+assign wdata = mem_to_reg ? dm_o : ALU_o;
 Reg_file #(.W(data_width),. N(num_reg)) Reg_file_0(
-.rreg1(instruct[25:21]), .rreg2(instruct[20:16]), .wreg(instruct[15:11]), 
-.wdata(), .write(), .clk(clk), .reset(reset), .rdata1(rdata1), .rdata2(rdata2)
+.rreg1(rreg1), .rreg2(rreg2), .wreg(wreg), .wdata(wdata), .write(reg_write), 
+.clk(clk), .reset(reset), .rdata1(rdata1), .rdata2(rdata2)
 );
+
+//Sign-extend
+sign_extend sign_extend_0(
+.in(instruct[15:0]), .out(extended)
+); 
 endmodule
 
 
@@ -43,6 +62,13 @@ d_ff d_ff [W] (.D(pc_i),
 	       .clk(clk),
 	       .reset(reset),
 	       .Q(pc_o));
+endmodule
+
+
+//~~~Sign-extend~~~//
+module sign_extend (input  [15:0] in,
+		    output [31:0] out);
+assign out = {16'b0, in};
 endmodule
 
 
