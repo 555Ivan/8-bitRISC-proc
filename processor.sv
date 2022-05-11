@@ -1,15 +1,17 @@
 //MIPS RISC 8-bit processor
 //
-//Need all the contrl logic
+//Needs to be tested, set up for external programing on the instruction mem
 module proc_top(input clk, reset);
 //parameter W represents data width
 parameter data_width = 8, addr_width = 8, num_reg = 5, instruct_width = 32;
 
 wire [instruct_width-1:0] instruct, inst_addr, pc_next, extended, pc_1, pc_branch;
-wire [data_width-1:0] dm_o, rdata1, rdata2, ALU_o, ALU_b;
-wire [num_reg-1:0] wreg;
+wire [data_width-1:0] dm_o, rdata1, rdata2, wdata, ALU_o, ALU_b;
+wire [num_reg-1:0] wreg, rreg1, rreg2;
+wire [5:0] op, fcode;
 wire [3:0] ALU_ctrl;
-wire reg_dst, branch, zero, mem_read, mem_to_reg, mem_write, alu_src, reg_write;
+wire [1:0] alu_op;
+wire reg_dst, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write, zero;
 
 //Program counter
 assign pc_1 = inst_addr + 32'b1;
@@ -25,15 +27,11 @@ SRAM #(.W(instruct_width), .N(instruct_width)) i_mem(
 .addr(inst_addr), .d_i(), .cs(1'b1), .oe(1'b1), .we(1'b0), .d_o(instruct)
 );
 
-//Data memory
-SRAM #(.W(data_width), .N(addr_width)) d_mem(
-.addr(ALU_o), .d_i(rdata2), .cs(1'b1), .oe(mem_read), .we(mem_write), .d_o(dm_o) 
-);
-
-//ALU
-assign ALU_b = alu_src ? extended[7:0] : rdata2 ;
-ALUnit #(.W(data_width)) ALU_0(
-.A(rdata1), .B(ALU_b), .ALU_ctrl(ALU_ctrl), .ALU_o(ALU_o), .cout(), .zero(zero)
+//Control Uniti
+assign op = instruct[31:26];
+control_unit control_u_0(
+.op(op), .alu_op(alu_op), .reg_dst(reg_dst), .branch(branch), .mem_read(mem_read), 
+.mem_to_reg(mem_to_reg), .mem_write(mem_write), .alu_src(alu_src), .reg_write(reg_write)
 );
 
 //Register file
@@ -46,10 +44,27 @@ Reg_file #(.W(data_width),. N(num_reg)) Reg_file_0(
 .clk(clk), .reset(reset), .rdata1(rdata1), .rdata2(rdata2)
 );
 
+//ALU Control
+assign fcode = instruct[5:0];
+alu_control alu_ctrl_0(
+.alu_op(alu_op), .fcode(fcode), .alu_ctrl(ALU_ctrl)
+);
+
 //Sign-extend
 sign_extend sign_extend_0(
 .in(instruct[15:0]), .out(extended)
 ); 
+
+//ALU
+assign ALU_b = alu_src ? extended[7:0] : rdata2 ;
+ALUnit #(.W(data_width)) ALU_0(
+.A(rdata1), .B(ALU_b), .ALU_ctrl(ALU_ctrl), .ALU_o(ALU_o), .cout(), .zero(zero)
+);
+
+//Data memory
+SRAM #(.W(data_width), .N(addr_width)) d_mem(
+.addr(ALU_o), .d_i(rdata2), .cs(1'b1), .oe(mem_read), .we(mem_write), .d_o(dm_o) 
+);
 endmodule
 
 
@@ -106,7 +121,7 @@ always@(ALU_ctrl, A, B, result) begin
 		1:  ALU_o <= A | B;       //or
 		2:  ALU_o <= result;      //add
 		6:  ALU_o <= result;      //sub
-		7:  ALU_o <= A < B ? 1:0; //slt
+		7:  ALU_o <= A < B ? 8'b1:8'b0; //slt
 		12: ALU_o <= ~(A|B);      //nor
 		default: ALU_o <= 0;
 	endcase
