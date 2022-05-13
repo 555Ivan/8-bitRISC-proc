@@ -1,0 +1,45 @@
+tCLA = tpg + tpg_block + (N/k -1)tand_or + k*tfa
+tFA = 450 ps
+tPA = tpg + log2N(tpgprefix) + txor
+
+
+8-bit ripple carry
+tFA = 8*450 = 3600
+
+8-bit adder 4-bit blocks
+tCLA = 150 + (6*150) + (8/4 -1)300 + (4*450) = 3150 ps
+
+8-bit adder 2-bit blocks
+tCLA = 150 + (2*150) + (8/2 -1)300 + (2*450) = 2250 ps
+
+8-bit adder 1-bit blocks
+tCLA = 150 + (0*150) + (8/1 -1)300 + (1*450) = 2700 ps
+
+64-bit adder 4-bit blocks
+tCLA = 150 + (6*150) + (64/4 -1)300 + (4*450) = 7350 ps
+
+8-bit prefix adder
+tPA = 150 + log2(8)*300 + 150 = 1200 ps
+
+
+
+With modified Gate delays (closer to real)
+
+tFA = 30+55 = 85 ps
+
+8-bit ripple carry
+tFA = 8*85 = 680 ps
+
+8-bit adder 4-bit blocks
+tCLA = 40 + (3*30 + 3*40) + (8/4 -1)(30+40) + (4*85) = 660 ps
+
+8-bit adder 2-bit blocks
+tCLA = 40 + (30+40) + (8/2 -1)(30+40) + (2*85) = 490 ps
+
+8-bit adder 1-bit blocks
+tCLA = 40 + (0*30 + 0*40) + (8/1 -1)(30+40) + (1*85) = 615 ps
+
+8-bit prefix adder
+tPA = 40 + log2(8)*(30+40) + 60 = 310 ps
+
+
