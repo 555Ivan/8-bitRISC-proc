@@ -2,7 +2,6 @@
 
 module ALU_tb;
 
-
 parameter CYCLE = 100;
 parameter W = 8;
 integer output_file;
@@ -14,14 +13,7 @@ reg [3:0] alu_ctrl;
 reg cout, zero;
 
 //instatiating DUT
-ALUnit ALUnit_0(
-	.A(a),
-	.B(b),
-	.ALU_ctrl(alu_ctrl),
-	.zero(zero),
-	.ALU_o(alu_o),
-	.cout(cout)
-);
+ALU ALUnit_0(.*);
 
 
 
@@ -86,7 +78,7 @@ repeat (1000) begin
 	a = $urandom_range((2**W)-1,0);
 	b = $urandom_range((2**W)-1,0);
 	i = $urandom_range(5,0);
-	if(i==0)      alu_ctrl = 0; //mapping i to proper ALU_ctrl inputs
+	if(i==0)      alu_ctrl = 0; //mapping i to proper alu_ctrl inputs
 	else if(i==1) alu_ctrl = 1;
 	else if(i==2) alu_ctrl = 2;
 	else if(i==3) alu_ctrl = 6;

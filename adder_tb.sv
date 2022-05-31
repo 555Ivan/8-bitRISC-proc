@@ -2,7 +2,6 @@
 
 module adder_tb;
 
-
 parameter CYCLE = 100;
 parameter W = 8;
 integer output_file;
@@ -14,21 +13,11 @@ reg cin, cout;
 
 
 //instatiating DUT
-prefixadder preadd_0(
-	.a(a),
-	.b(b),
-	.cin(cin),
-	.s(s),
-	.cout(cout)
-);
+//prefixadder preadd_0(.*);
 
-//CLAadder CLAadder_0(
-//         .a(a),
-//         .b(b),
-//	 .cin(cin),
-//	 .s(s),
-//	 .cout(cout)
-//);
+//CLAadder CLAadder_0(.*);
+
+gate_prefixadder preadd_0(.*);
 
 //setting up output file
 initial begin
@@ -59,9 +48,10 @@ wrong = 0;
 		end
 	end	
 	$fdisplay(output_file, "Correct = %d  ~~~~~ Wrong = %d", correct, wrong);
-	$fclose(output_file);
-	$display("Operation done, Time = %0t",$time);
-	$stop;
+        $display("Correct = %d  ~~~~~ Wrong = %d", correct, wrong);
+        $fclose(output_file);
+        $display("Operation done, Time = %0t",$time);
+        $stop;
 
 end
 

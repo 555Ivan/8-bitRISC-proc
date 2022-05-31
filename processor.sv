@@ -1,44 +1,50 @@
 //MIPS RISC 8-bit processor
 //
-//Needs to be tested, set up for external programing on the instruction mem
-module proc_top(input clk, reset);
-//parameter W represents data width
+//fix i_mem issue: w/ size of memory 32**N results in an issue of either a i_mem of 0 or throws an error
+module proc_top(input clk, reset, write, prog, //data_i, addr, write, and prog used for programming
+                input [31:0] data_i, addr);
+//parameters
 parameter data_width = 8, addr_width = 8, num_reg = 5, instruct_width = 32;
 
-wire [instruct_width-1:0] instruct, inst_addr, pc_next, extended, pc_1, pc_branch;
-wire [data_width-1:0] dm_o, rdata1, rdata2, wdata, ALU_o, ALU_b;
+//internal wires
+wire [instruct_width-1:0] instruct, inst_addr, pc_next, extended, pc_1, pc_branch, pc, pc_jmp, pc_branch_1;
+wire [data_width-1:0] dm_o, rdata1, rdata2, wdata, alu_o, alu_b;
 wire [num_reg-1:0] wreg, rreg1, rreg2;
 wire [5:0] op, fcode;
-wire [3:0] ALU_ctrl;
+wire [3:0] alu_ctrl;
 wire [1:0] alu_op;
-wire reg_dst, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write, zero;
+wire reg_dst, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write, zero, writting, jmp;
 
 //Program counter
-assign pc_1 = inst_addr + 32'b1;
+assign pc_1 = inst_addr + 32'h0_0_0_0_0_0_0_1;
 assign pc_branch = pc_1 + extended;
-assign pc_next = (branch & zero) ? pc_branch : pc_1;
+assign pc_branch_1 = (branch & zero) ? pc_branch : pc_1;
+assign pc_jmp = {2'b00, pc_1[31:28], instruct[25:0]};
+assign pc_next = jmp ? pc_jmp : pc_branch_1;
 prog_cnt #(.W(instruct_width)) prog_cnt_0(
-.pc_i(pc_next), .reset(reset), .clk(clk), .pc_o(inst_addr)
+.pc_i(pc_next), .reset(reset), .clk(clk), .pc_o(pc)
 );
 
 //Instruction memory
-//set up for external programing
-SRAM #(.W(instruct_width), .N(instruct_width)) i_mem(
-.addr(inst_addr), .d_i(), .cs(1'b1), .oe(1'b1), .we(1'b0), .d_o(instruct)
+//External programing logic
+assign inst_addr = prog ? addr : pc;
+assign writting = (write & prog);
+SSRAM #(.W(instruct_width), .N(16)) i_mem(
+.addr(inst_addr), .d_i(data_i), .cs(1'b1), .oe(1'b1), .we(writting), .clk(clk), .d_o(instruct)
 );
 
-//Control Uniti
+//Control Unit
 assign op = instruct[31:26];
 control_unit control_u_0(
 .op(op), .alu_op(alu_op), .reg_dst(reg_dst), .branch(branch), .mem_read(mem_read), 
-.mem_to_reg(mem_to_reg), .mem_write(mem_write), .alu_src(alu_src), .reg_write(reg_write)
+.mem_to_reg(mem_to_reg), .mem_write(mem_write), .alu_src(alu_src), .reg_write(reg_write), .jmp(jmp)
 );
 
 //Register file
 assign rreg1 = instruct[25:21];
 assign rreg2 = instruct[20:16];
 assign wreg  = reg_dst ? instruct [15:11] : rreg2;
-assign wdata = mem_to_reg ? dm_o : ALU_o;
+assign wdata = mem_to_reg ? dm_o : alu_o;
 Reg_file #(.W(data_width),. N(num_reg)) Reg_file_0(
 .rreg1(rreg1), .rreg2(rreg2), .wreg(wreg), .wdata(wdata), .write(reg_write), 
 .clk(clk), .reset(reset), .rdata1(rdata1), .rdata2(rdata2)
@@ -47,7 +53,7 @@ Reg_file #(.W(data_width),. N(num_reg)) Reg_file_0(
 //ALU Control
 assign fcode = instruct[5:0];
 alu_control alu_ctrl_0(
-.alu_op(alu_op), .fcode(fcode), .alu_ctrl(ALU_ctrl)
+.alu_op(alu_op), .fcode(fcode), .alu_ctrl(alu_ctrl)
 );
 
 //Sign-extend
@@ -56,14 +62,14 @@ sign_extend sign_extend_0(
 ); 
 
 //ALU
-assign ALU_b = alu_src ? extended[7:0] : rdata2 ;
-ALUnit #(.W(data_width)) ALU_0(
-.A(rdata1), .B(ALU_b), .ALU_ctrl(ALU_ctrl), .ALU_o(ALU_o), .cout(), .zero(zero)
+assign alu_b = alu_src ? extended[7:0] : rdata2 ;
+ALU #(.W(data_width)) ALU_0(
+.a(rdata1), .b(alu_b), .alu_ctrl(alu_ctrl), .alu_o(alu_o), .cout(), .zero(zero)
 );
 
 //Data memory
-SRAM #(.W(data_width), .N(addr_width)) d_mem(
-.addr(ALU_o), .d_i(rdata2), .cs(1'b1), .oe(mem_read), .we(mem_write), .d_o(dm_o) 
+SSRAM #(.W(data_width), .N(addr_width)) d_mem(
+.addr(alu_o), .d_i(rdata2), .cs(1'b1), .oe(mem_read), .we(mem_write), .clk(clk), .d_o(dm_o) 
 );
 endmodule
 
@@ -83,20 +89,20 @@ endmodule
 //~~~Sign-extend~~~//
 module sign_extend (input  [15:0] in,
 		    output [31:0] out);
-assign out = {16'b0, in};
+assign out = {{16{in[15]}}, in};
 endmodule
 
 
-//~~~SRAM~~~// 256 X 8 
-module SRAM #(parameter W = 8, N = 8)
+//~~~Synchronous-SRAM~~~// 256 X 8 
+module SSRAM #(parameter W = 8, N = 8)
              (input  [N-1:0] addr,
               input  [W-1:0] d_i,
-              input  cs, oe, we,
+              input  cs, oe, we, clk,
               output [W-1:0] d_o);
 
 reg [W-1:0] mem [2**N];
 
-always @(*) begin
+always @(posedge clk) begin
 	if(cs & we) mem[addr] <= d_i;
 end
 
@@ -105,39 +111,39 @@ endmodule
 
 
 //~~~ALU~~~// 
-module ALUnit #(parameter W = 8)
-	       (input  [W-1:0] A, B,
-	        input  [3:0] ALU_ctrl,
-		output reg [W-1:0] ALU_o,
+module ALU #(parameter W = 8)
+	       (input  [W-1:0] a, b,
+	        input  [3:0] alu_ctrl,
+		output reg [W-1:0] alu_o,
 		output reg cout, 
 		output zero);
 integer i;
-reg [W-1:0] B_inv, result;
+reg [W-1:0] b_inv, result;
 wire sub;
 
-always@(ALU_ctrl, A, B, result) begin
-	case (ALU_ctrl) 
-		0:  ALU_o <= A & B;       //and
-		1:  ALU_o <= A | B;       //or
-		2:  ALU_o <= result;      //add
-		6:  ALU_o <= result;      //sub
-		7:  ALU_o <= A < B ? 8'b1:8'b0; //slt
-		12: ALU_o <= ~(A|B);      //nor
-		default: ALU_o <= 0;
+always@(alu_ctrl, a, b, result) begin
+	case (alu_ctrl) 
+		0:  alu_o <= a & b;             //and
+		1:  alu_o <= a | b;             //or
+		2:  alu_o <= result;            //add
+		6:  alu_o <= result;            //sub
+		7:  alu_o <= a < b ? 8'b1:8'b0; //slt
+		12: alu_o <= ~(a|b);            //nor
+		default: alu_o <= 0;
 	endcase
 end
 
 always @(*) begin
-	for(i=0;i<W;i++) B_inv[i] = B[i] ^ sub;
+	for(i=0;i<W;i++) b_inv[i] = b[i] ^ sub;
 end
-prefixadder preadd_0(.a(A),
-		     .b(B_inv),
+prefixadder preadd_0(.a(a),
+		     .b(b_inv),
 		     .cin(sub),
 		     .s(result),
 		     .cout(cout)
 );
-assign sub = (ALU_ctrl == 6);
-assign zero = (ALU_o == 0);
+assign sub = (alu_ctrl == 6);
+assign zero = (alu_o == 0);
 endmodule
 
 

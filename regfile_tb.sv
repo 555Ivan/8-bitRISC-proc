@@ -1,8 +1,6 @@
 `timescale 1ns/1ns
-`include "randinput.sv"
 
 module regfile_tb;
-
 
 parameter CYCLE = 50;
 parameter W = 8, N = 5;
@@ -15,7 +13,8 @@ reg [N-1:0] rreg1, rreg2, wreg;
 reg write, clk, reset;
 
 //instatiating DUT
-Reg_file regfile_0(.*);
+//Reg_file regfile_0(.*);
+gate_Reg_file regfile_0(.*);
 
 //setting up clock signal
 initial clk = 0;
@@ -35,7 +34,7 @@ reset = 1'b1;
 reset = 1'b0;
 end
 
-//Testing all possible inputs
+//Testing with random inputs
 initial begin
 correct = 0;
 wrong = 0;
@@ -75,11 +74,12 @@ repeat (1000) begin
 	#(CYCLE);
 	write = 1'b0;
 	#(CYCLE);//mainly to help provide a clear separation in the wave view
-
+	//checking if data was loaded written
 	if (rdata1 == k && rdata2 == m) begin
 		$fdisplay(output_file, "rdata1 = %d  rdata2 = %d  wdata1 = %d  wdata2 = %d  CORRECT",rdata1,rdata2,k,m);
 		correct++;
 	end
+	//edge case where rreg1 and rreg2 got the same input addr due to random input k no longer valid to check
 	else if ((rreg1 == rreg2) && (rdata1 == m) && (rdata2 == m)) begin
 		$fdisplay(output_file, "rdata1 = %d  rdata2 = %d  wdata1 = %d  wdata2 = %d  CORRECT",rdata1,rdata2,k,m);
 		correct++;
